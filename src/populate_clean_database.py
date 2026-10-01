@@ -13,7 +13,7 @@ class PopulateDatabase:
         self.db_connection = self.connection.db_connection
         self.cursor = self.connection.cursor
 
-        self.file_name = "porto.csv"
+        self.file_name = "../porto/porto.csv"
 
         self.trip_batch_size = 2000
         self.gps_batch_size = 20000
