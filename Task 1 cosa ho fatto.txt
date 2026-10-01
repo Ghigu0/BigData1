@@ -1,0 +1,236 @@
+Allora le colonne sono: 
+
+Ti spiego ogni colonna in modo pratico.
+    - TRIP_ID: è l’identificatore univoco del viaggio. Serve a distinguere un viaggio da tutti gli altri. 
+        In teoria due righe diverse non dovrebbero avere lo stesso TRIP_ID.     
+    
+    - CALL_TYPE: indica come è iniziato il viaggio. Può essere:
+        - A = viaggio richiesto tramite centrale
+        - B = viaggio richiesto da una stazione taxi
+        - C = taxi fermato per strada
+        È quindi una variabile categoriale.    
+    
+    - ORIGIN_CALL: contiene l’ID del cliente che ha fatto la chiamata, ma solo se CALL_TYPE = A. 
+        Negli altri casi è NULL. Quindi molti valori mancanti qui sono normali e previsti dal dataset.     
+    
+    - ORIGIN_STAND: contiene l’ID della stazione taxi da cui è partito il viaggio, ma solo se CALL_TYPE = B. 
+        Negli altri casi è NULL. Anche qui, molti NULL sono attesi.    
+    
+    - TAXI_ID: identifica il taxi che ha effettuato il viaggio. Lo stesso taxi può comparire in tante righe, 
+        perché può aver effettuato molti viaggi diversi.     
+
+    - TIMESTAMP: indica l’istante di inizio del viaggio, ma è memorizzato come Unix timestamp, cioè numero di 
+        secondi trascorsi dal 1 gennaio 1970. La consegna dice che dovrebbe essere convertito in un formato 
+        DATETIME standard per le query.     
+
+    - DAY_TYPE: indica il tipo di giorno:
+        - A = giorno normale
+        - B = festività o giorno speciale
+        - C = giorno prima di una festività
+        Anche questa è una variabile categoriale.     
+
+    - MISSING_DATA: è un booleano che ti dice se nella traiettoria GPS mancano punti:
+        - FALSE = traiettoria completa
+        - TRUE = alcuni punti GPS sono mancanti ( ma non sai quali nel pratico )
+    Non significa necessariamente che tutta la POLYLINE sia vuota.     
+
+    - POLYLINE: è la colonna più particolare. Contiene la traiettoria del taxi come lista di punti GPS. Ogni punto è:
+    [longitude, latitude] e i punti sono campionati ogni 15 secondi.    
+
+    Per esempio: [[-8.618643, 41.141412], [-8.618499, 41.141376], [-8.618346, 41.141353]]
+
+    significa che il taxi è passato attraverso tre posizioni successive.
+
+
+
+    POLYLINE: testo dice che righe con meno di 3 punti devono essere marcate come INVALID nel database 
+ 
+
+
+
+
+ho runnato un codice python fatto da chat per vedere se i dati nel file sono coerenti con quanto detto nella documentazione
+
+
+        === RISULTATI ===
+        Numero totale di righe: 1710670
+
+        === VALORI MANCANTI ===
+        TRIP_ID: 0 (0.0000%)
+        CALL_TYPE: 0 (0.0000%)
+        TAXI_ID: 0 (0.0000%)
+        TIMESTAMP: 0 (0.0000%)
+        DAY_TYPE: 0 (0.0000%)
+        MISSING_DATA: 0 (0.0000%)
+        POLYLINE: 0 (0.0000%)
+
+        CALL_TYPE non validi: 0
+        DAY_TYPE non validi: 0
+        CALL_TYPE A con ORIGIN_CALL mancante: 0
+        CALL_TYPE B con ORIGIN_STAND mancante: 11302        PROBLEMA 
+        POLYLINE vuote: 5901
+
+        praticamente ci sono delle righe, dove CALL_TYPE=B ma che poi non mettono ORIGIN_STAND, che ci dovrebbe essere ma invece è NULL
+        il testo non dice esplicitamente che le CALL_TYPE B devono avere questo campo, ma che questo campo se è presente è associato a CALL_TYPE B 
+
+        inoltre il risultato del test mostra che per polyline NON ci sono righe NULL, ma solo righe vuote
+
+
+Analizziamo ora sempre tramite script python il numero di righe Invalide, e che impatto hanno sui dati
+
+        === RISULTATI ===
+        Totale viaggi: 1710670
+
+        Viaggi con 0 punti: 5901
+        Viaggi con 1 punto: 30609
+        Viaggi con 2 punti: 7394
+
+        Viaggi con almeno 3 punti: 1666766
+
+        === INVALID TRIPS ===
+        Totale viaggi invalidi: 43904
+        Percentuale invalidi: 2.5665%
+
+Infine un'analisi generica sulla distribuzione dei dati per vedere cosa aspettarci 
+
+        === DATASET ===
+        Numero totale di viaggi: 1710670
+
+        === DISTRIBUZIONE CALL_TYPE ===
+        A: 364770 viaggi (21.32%)
+        B: 817881 viaggi (47.81%)
+        C: 528019 viaggi (30.87%)
+
+        === DISTRIBUZIONE DAY_TYPE ===
+        A: 1710670 viaggi (100.00%)
+
+        === DISTRIBUZIONE MISSING_DATA ===
+        False: 1710660 viaggi (100.00%)
+        True: 10 viaggi (0.00%)
+
+        === DISTRIBUZIONE VIAGGI PER TAXI ===
+        Numero di taxi: 448
+        Media viaggi per taxi: 3818.46
+        Mediana viaggi per taxi: 3732.0
+        Minimo viaggi per taxi: 1
+        Massimo viaggi per taxi: 10746
+
+infine un'ultima analisi suggerita da chat 
+
+    
+        === DUPLICATI TRIP_ID ===
+        TRIP_ID duplicati: 81                           <- IMPORTANTE DIREI 
+
+        === COERENZA CALL_TYPE / ORIGIN ===
+        CALL_TYPE A senza ORIGIN_CALL: 0
+        CALL_TYPE A con ORIGIN_STAND valorizzato: 0
+        CALL_TYPE B senza ORIGIN_STAND: 11302
+        CALL_TYPE B con ORIGIN_CALL valorizzato: 0
+        CALL_TYPE C con ORIGIN_CALL valorizzato: 0
+        CALL_TYPE C con ORIGIN_STAND valorizzato: 0
+
+        === MISSING_DATA = TRUE ===
+        Numero record con MISSING_DATA=True: 10
+        Numero di punti nelle loro POLYLINE: [43, 1, 11, 483, 285, 51, 27, 14, 1, 53]
+        Di questi, invalidi (<3 punti): 2
+
+        === RANGE TEMPORALE ===
+        TIMESTAMP minimo: 1372636853 -> 2013-07-01 00:00:53
+        TIMESTAMP massimo: 1404172796 -> 2014-06-30 23:59:56
+
+vediamo se i duplicati sono uguali identici o diversi 
+
+
+
+
+
+(BigData) C:\Users\fbinn\Desktop\BigData1\porto>python duplicated_ID.py
+=== DUPLICATI TRIP_ID ===
+
+ID duplicati con righe identiche: 2			
+   1378607552620000403					per questi due ID abbiamo due righe identiche: stesso id e stessi campi
+   1391416612620000196
+
+ID duplicati con righe diverse: 78
+   1372702836620000080					per questi ID, abbiamo che si ripetono ma con campi diversi. due o più righe hanno questo ID, ma poi hanno colonne diverse
+   1373025987620000601
+   1373210896620000598
+   1373551710620000014
+   1374014097620000337
+   1374151597620000080
+   1374157861620000328
+   1374262188620000554
+   1378830230620000435
+   1378866507620000648
+   1381308181620000352
+   1381645412620000328
+   1381765723620000392
+   1381859675620000465
+   1382450880620000432
+   1383341250620000588
+   1383557098620000562
+   1385631430620000080
+   1385772222620000263
+   1385928574620000080
+   1385928575620000080
+   1386167379620000080
+   1386942349620000080
+   1386947218620000080
+   1387206043620000080
+   1387839159620000080
+   1387909459620000429
+   1387937085620000080
+   1388279758620000080
+   1388526838620000080
+   1389002485620000685
+   1389561280620000080
+   1389782974620000562
+   1391186543620000513
+   1391586783620000484
+   1391717369620000663
+   1391729840620000663
+   1391931520620000286
+   1392271509620000286
+   1392317061620000066
+   1392499655620000663
+   1392640481620000663
+   1392816672620000663
+   1393315427620000513
+   1393462842620000620
+   1393472034620000620
+   1393686091620000161
+   1393869017620000066
+   1394034338620000328
+   1394118360620000066
+   1394207135620000588
+   1395055378620000315
+   1395682280620000089
+   1396333938620000397
+   1397121307620000196
+   1397172149620000454
+   1397199117620000513
+   1397742650620000393
+   1398185156620000066
+   1398185157620000066
+   1399224694620000548
+   1399908941620000099
+   1399918717620000571
+   1400060661620000080
+   1401307305620000129
+   1401346641620000319
+   1401469148620000104
+   1401826158620000196
+   1401840748620000196
+   1402085470620000527
+   1402132342620000571
+   1402586210620000400
+   1402716036620000243
+   1403115272620000066
+   1403323491620000600
+   1403407180620000242
+   1403716904620000337
+   1404093316620000307
+
+(BigData) C:\Users\fbinn\Desktop\BigData1\porto>
+
+
