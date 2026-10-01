@@ -1,0 +1,135 @@
+Lo schema che ti consiglio
+Io userei tre tabelle:
+
+
+            Taxi                ( un taxi è associato a molti trip, ma un trip ha un solo taxi )
+            |
+            | 1 : N
+            |
+            Trip                ( un viaggio può avere molti punti GPS, ma ogni punto GPS appartiene a un solo viaggio )
+            |
+            | 1 : N
+            |
+            GPSPoint
+
+Il ragionamento è naturale:
+- un taxi può fare molti viaggi;
+- ogni viaggio appartiene a un taxi;
+- ogni viaggio contiene molti punti GPS.
+Questa struttura è particolarmente adatta perché la POLYLINE è una struttura annidata e 
+la consegna stessa sottolinea che deve essere trasformata e memorizzata con attenzione.
+
+
+TAXI                                        la tabella taxi in realtà è omittibile, dato che non ha altre cose
+
+        CREATE TABLE Taxi (
+            taxi_id BIGINT PRIMARY KEY
+        );
+
+
+TRIP 
+
+
+        CREATE TABLE Trip (
+
+            trip_id BIGINT PRIMARY KEY,     // id del viaggio
+
+            taxi_id BIGINT NOT NULL,        // id del taxi 
+
+            call_type CHAR(1) NOT NULL,     // tipo di chiamata
+
+            origin_call BIGINT NULL,        //ID del cliete, solo se call_type = A
+
+            origin_stand INT NULL,          //ID del taxi stand, solo se call_type = B 
+
+            start_time DATETIME NOT NULL,   //timestamp convertito da unix time a un vero datetime
+
+            day_type CHAR(1) NOT NULL,      //anche se nel dataset è sempre A
+
+            missing_data BOOLEAN NOT NULL,
+
+            point_count INT NOT NULL,       // colonna aggiunta: contiene il numero di punti GPS, per righe invalide
+
+            FOREIGN KEY (taxi_id)           // collegamento con la tabella Taxi_id
+                REFERENCES Taxi(taxi_id),
+
+            CHECK (call_type IN ('A', 'B', 'C')),
+
+            CHECK (day_type IN ('A', 'B', 'C'))
+
+            CHECK (                             // questo è un vincolo un po' largo, perchè mi sono spaventato dal caso origin_stand
+                    origin_call IS NULL
+                    OR call_type = 'A'
+                    )
+
+            CHECK (                             // questo è così per via del dataset
+                    origin_stand IS NULL
+                    OR call_type = 'B'
+                    )
+
+        );
+
+        e chat aggiungerebbe 
+
+            CREATE INDEX idx_trip_taxi_start        
+            ON Trip(taxi_id, start_time);
+            Nel vostro assignment è particolarmente utile per la domanda sull’idle
+            time tra viaggi consecutivi, perché dovrai prendere i viaggi di ogni taxi ordinati cronologicamente
+
+            CREATE INDEX idx_trip_call_type
+            ON Trip(call_type);
+            Detto questo, una precisazione importante: l’indice su call_type probabilmente non è molto utile nel 
+            tuo dataset, perché call_type ha solo 3 valori possibili. MySQL spesso non trae grandi vantaggi da un indice su una colonna con pochissima varietà.
+
+
+    GPS POINT 
+
+            CREATE TABLE GPSPoint (
+            trip_id BIGINT NOT NULL,        // per identificare il trip
+
+            point_index INT NOT NULL,       // numero del punto di questo viaggio 
+
+            longitude DOUBLE NOT NULL,
+            latitude DOUBLE NOT NULL,
+
+            PRIMARY KEY (trip_id, point_index), //la chiave è il viaggio e il numero del punto 
+
+            FOREIGN KEY (trip_id)
+                REFERENCES Trip(trip_id)
+                ON DELETE CASCADE,          // se elimini un viaggio, elimini tutte le righe che costruiscono il gpspoint
+
+            CHECK (longitude BETWEEN -180 AND 180),
+            CHECK (latitude BETWEEN -90 AND 90)
+        );
+
+
+    in questo modo una polilyne come 
+    [
+        [-8.618643, 41.141412],
+        [-8.618499, 41.141376],
+        [-8.618346, 41.141353]
+    ]
+
+    diventa 
+
+    trip_id   point_index   longitude    latitude
+    123       0             -8.618643    41.141412
+    123       1             -8.618499    41.141376
+    123       2             -8.618346    41.141353
+
+
+
+
+
+
+
+Poblema trovato	                            Cosa farei
+CALL_TYPE=B senza ORIGIN_STAND	            Mantengo il viaggio e inserisco origin_stand = NULL
+MISSING_DATA=True	                        Mantengo il viaggio e i GPS disponibili, conservando il flag
+POLYLINE=[]	                                Mantengo Trip, ma inserisco 0 righe in GPSPoint
+POLYLINE con 1 o 2 punti	                Mantengo Trip e i punti disponibili
+<3 punti	                                Non elimino: sarà un invalid trip
+DAY_TYPE sempre A	                        Mantengo comunque la colonna
+timestamp Unix	                            Lo converto in DATETIME
+2 TRIP_ID con duplicati identici	        Tengo una sola copia
+78 TRIP_ID con record conflittuali	        Va presa una decisione specifica prima dell'inserimento
