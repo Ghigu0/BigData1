@@ -12,7 +12,8 @@ Dati per connettersi alla Vm con il nostro profilo tramite la classe python del 
 
 per connettersi manualmente ( dopo aver acceso la VPN )
 
-        ssh nomeutente@tdt4225-25.idi.ntnu.no   
+        ssh nomeutente@tdt4225-25.idi.ntnu.no 
+        ssh francbin@tdt4225-25.idi.ntnu.no   
         
 il mio nomeutente per esempio è francbin, è quello della mail istituzionale.
 
