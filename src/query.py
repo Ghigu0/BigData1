@@ -120,53 +120,81 @@ class Task2:
         print(tabulate(average_rows, headers=self.cursor.column_names))
 
      
-        #distanza media 
-        query = """
-                SELECT
-                    t.trip_id,
-                    t.call_type,
-                    g.point_index,
-                    g.latitude,
-                    g.longitude
-                FROM Trip t
-                JOIN GPSPoint g
-                    ON t.trip_id = g.trip_id
-                ORDER BY t.trip_id, g.point_index;
-            """
 
-        self.cursor.execute(query)
-        rows = self.cursor.fetchall()
+
+
+     
+       # Get call_type for each trip
+        query_trip_types = """
+            SELECT trip_id, call_type
+            FROM Trip;
+        """
+
+        self.cursor.execute(query_trip_types)
+        trip_rows = self.cursor.fetchall()
+
+        trip_call_type = {}
+
+        for trip_id, call_type in trip_rows:
+            trip_call_type[trip_id] = call_type
+
+
+        # Get GPS points without JOIN
+        query_points = """
+            SELECT
+                trip_id,
+                point_index,
+                latitude,
+                longitude
+            FROM GPSPoint
+            ORDER BY trip_id, point_index;
+        """
+
+        self.cursor.execute(query_points)
 
         trip_distances = {}
         previous_point = None
         previous_trip_id = None
-        current_call_type = None
 
-        for trip_id, call_type, point_index, latitude, longitude in rows:
-            current_point = (latitude, longitude)
-            # New trip
-            if trip_id != previous_trip_id:
-                previous_trip_id = trip_id
-                previous_point = current_point
-                current_call_type = call_type
+        while True:
 
-                if call_type not in trip_distances:
-                    trip_distances[call_type] = []
+            rows = self.cursor.fetchmany(10000)
 
-                trip_distances[call_type].append(0)
-            else:
-                distance = haversine( previous_point, current_point, unit=Unit.KILOMETERS)
-                trip_distances[current_call_type][-1] += distance
-                previous_point = current_point
+            if not rows:
+                break
+
+            for trip_id, point_index, latitude, longitude in rows:
+
+                current_point = (latitude, longitude)
+                call_type = trip_call_type[trip_id]
+
+                if trip_id != previous_trip_id:
+
+                    previous_trip_id = trip_id
+                    previous_point = current_point
+
+                    if call_type not in trip_distances:
+                        trip_distances[call_type] = []
+
+                    trip_distances[call_type].append(0)
+
+                else:
+
+                    distance = haversine(
+                        previous_point,
+                        current_point,
+                        unit=Unit.KILOMETERS
+                    )
+
+                    trip_distances[call_type][-1] += distance
+
+                    previous_point = current_point
 
         print("\nQUERY 4b - Average distance per call type\n")
         for call_type, distances in trip_distances.items():
             average_distance = sum(distances) / len(distances)
-            print(  call_type,
-                    round(average_distance, 2),
-                    "km")
-
-
+            print(  call_type, round(average_distance, 2), "km")
+ 
         # 2. Share of trips in the four time bands
         query_time_bands = """
             SELECT
@@ -448,13 +476,13 @@ def main():
     try:
         program = Task2()
 
-        program.query1()
+        #program.query1() testata funziona 
 
-        program.query2()
+        #program.query2() worka
 
-        program.query3()
+        #program.query3() worka
 
-        program.query4a()
+        #program.query4a() worka
 
         program.query4b()
 
