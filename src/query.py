@@ -49,7 +49,7 @@ class Task2:
         rows = self.cursor.fetchall()
         print("\nQUERY 2")
         print("What is the average number of trips per taxi?\n")
-        print(tabulate(rows, headers=average_trips_per_taxi))
+        print(tabulate(rows, headers="average_trips_per_taxi"))
 
 
     def query3(self): #query number 3   ( FUNZIONA )
