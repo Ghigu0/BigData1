@@ -9,7 +9,7 @@ class Task2:
         self.db_connection = self.connection.db_connection
         self.cursor = self.connection.cursor
 
-    def query1(self): #query number 1
+    def query1(self): #query number 1   ( FUNZIONA )
       
 
         query = """
@@ -33,6 +33,31 @@ class Task2:
 
         return rows
 
+    def query2(self): #query number 2   ( FUNZIONA )
+        """
+        SELECT AVG(trip_count) AS average_trips_per_taxi
+        FROM (
+            SELECT taxi_id, COUNT(*) AS trip_count
+            FROM Trip
+            GROUP BY taxi_id
+        ) AS trips_per_taxi;
+        """
+        query = """
+            SELECT COUNT(*) / COUNT(DISTINCT taxi_id)
+            FROM Trip;
+        """
+
+        self.cursor.execute(query)
+        rows = self.cursor.fetchall()
+
+        print("\nQUERY 2")
+        print("What is the average number of trips per taxi?\n")
+
+        print(tabulate(rows, headers=self.cursor.column_names))
+
+        return rows
+
+
 
 def main():
     program = None
@@ -41,9 +66,10 @@ def main():
         program = Task2()
 
         #execute query number 1 
-        program.query1()
+        #program.query1()
 
         #execute query number 2
+        program.query2()
 
     except Exception as e:
         print("ERROR: Failed to use database:", e)
