@@ -134,37 +134,37 @@ class Task2:
                 ORDER BY t.trip_id, g.point_index;
             """
 
-            self.cursor.execute(query)
-            rows = self.cursor.fetchall()
+        self.cursor.execute(query)
+        rows = self.cursor.fetchall()
 
-            trip_distances = {}
-            previous_point = None
-            previous_trip_id = None
-            current_call_type = None
+        trip_distances = {}
+        previous_point = None
+        previous_trip_id = None
+        current_call_type = None
 
-            for trip_id, call_type, point_index, latitude, longitude in rows:
-                current_point = (latitude, longitude)
-                # New trip
-                if trip_id != previous_trip_id:
-                    previous_trip_id = trip_id
-                    previous_point = current_point
-                    current_call_type = call_type
+        for trip_id, call_type, point_index, latitude, longitude in rows:
+            current_point = (latitude, longitude)
+            # New trip
+            if trip_id != previous_trip_id:
+                previous_trip_id = trip_id
+                previous_point = current_point
+                current_call_type = call_type
 
-                    if call_type not in trip_distances:
-                        trip_distances[call_type] = []
+                if call_type not in trip_distances:
+                    trip_distances[call_type] = []
 
-                    trip_distances[call_type].append(0)
-                else:
-                    distance = haversine( previous_point, current_point, unit=Unit.KILOMETERS)
-                    trip_distances[current_call_type][-1] += distance
-                    previous_point = current_point
+                trip_distances[call_type].append(0)
+            else:
+                distance = haversine( previous_point, current_point, unit=Unit.KILOMETERS)
+                trip_distances[current_call_type][-1] += distance
+                previous_point = current_point
 
-            print("\nQUERY 4b - Average distance per call type\n")
-            for call_type, distances in trip_distances.items():
-                average_distance = sum(distances) / len(distances)
-                print(  call_type,
-                        round(average_distance, 2),
-                        "km")
+        print("\nQUERY 4b - Average distance per call type\n")
+        for call_type, distances in trip_distances.items():
+            average_distance = sum(distances) / len(distances)
+            print(  call_type,
+                    round(average_distance, 2),
+                    "km")
 
 
         # 2. Share of trips in the four time bands
