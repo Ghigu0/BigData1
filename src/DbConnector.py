@@ -3,22 +3,40 @@ import mysql.connector as mysql
 
 class DbConnector:
     """
-    Connects to the MySQL server on the Ubuntu virtual machine.
-    Connector needs HOST, DATABASE, USER and PASSWORD to connect,
-    while PORT is optional and should be 3306.
+    this code has been modified, so the program can be runned both on the VM or in local if a docker container is been used.
+    The container was created like this:
+    docker run --name porto-mysql \
+        -e MYSQL_ROOT_PASSWORD=root \
+        -e MYSQL_DATABASE=gruppo_25 \
+        -p 3306:3306 \
+        -v porto-mysql-data:/var/lib/mysql \
+        -d mysql:8.0
 
-    Example:
-    HOST = "tdt4225-00.idi.ntnu.no" // Your server IP address/domain name
-    DATABASE = "testdb" // Database name, if you just want to connect to MySQL server, leave it empty
-    USER = "testuser" // This is the user you created and added privileges for
-    PASSWORD = "test123" // The password you set for said user
     """
 
-    def __init__(self,
-                 HOST="tdt4225-25.idi.ntnu.no",
-                 DATABASE="gruppo_25",
-                 USER="gruppo25",
-                 PASSWORD="gruppo25"):
+    def __init__(self):
+
+        print("Choose where to run the program:")
+        print("1 - Local MySQL")
+        print("2 - NTNU VM")
+
+        choice = input("Enter 1 or 2: ")
+
+        if choice == "1":
+            HOST = "localhost"
+            DATABASE = "gruppo_25"
+            USER = "root"
+            PASSWORD = "root"
+
+        elif choice == "2":
+            HOST = "tdt4225-25.idi.ntnu.no"
+            DATABASE = "gruppo_25"
+            USER = "gruppo25"
+            PASSWORD = "gruppo25"
+
+        else:
+            raise ValueError("Invalid choice. Please enter 1 or 2.")
+
         # Connect to the database
         try:
             self.db_connection = mysql.connect(host=HOST, database=DATABASE, user=USER, password=PASSWORD, port=3306)
