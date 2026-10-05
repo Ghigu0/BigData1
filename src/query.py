@@ -225,8 +225,9 @@ class Task2:
         results = sorted(trips_near_city_hall)
         print("\nQUERY 6")
         print("Trips that passed within 100 m of Porto City Hall:\n")
-        for trip_id in results: print(trip_id)
-        print("\nTotal trips:", len(results))
+        print("Total trips:", len(results))
+        print("\nFirst 20:\n")
+        print(tabulate([[trip_id] for trip_id in results[:20]], headers=["trip_id"]))
 
     def query7(self):
 
