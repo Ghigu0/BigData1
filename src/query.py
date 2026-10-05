@@ -326,7 +326,13 @@ class Task2:
 
     def query6(self):
 
-        city_hall = (41.15794, -8.62911)  # (latitude, longitude)
+        city_hall = (41.15794, -8.62911)
+
+        # Approximate bounding box of 100 m around Porto City Hall
+        lat_min = 41.15794 - 0.0009
+        lat_max = 41.15794 + 0.0009
+        lon_min = -8.62911 - 0.0012
+        lon_max = -8.62911 + 0.0012
 
         query = """
             SELECT
@@ -334,24 +340,48 @@ class Task2:
                 latitude,
                 longitude
             FROM GPSPoint
-            ORDER BY trip_id, point_index;
+            WHERE latitude BETWEEN %s AND %s
+            AND longitude BETWEEN %s AND %s;
         """
 
-        self.cursor.execute(query)
-        rows = self.cursor.fetchall()
+        self.cursor.execute(
+            query,
+            (lat_min, lat_max, lon_min, lon_max)
+        )
+
         trips_near_city_hall = set()
-        for trip_id, latitude, longitude in rows:
 
-            point = (latitude, longitude)
-            distance = haversine(city_hall, point, unit=Unit.METERS )
+        while True:
 
-            if distance <= 100: trips_near_city_hall.add(trip_id)
+            rows = self.cursor.fetchmany(10000)
+
+            if not rows:
+                break
+
+            for trip_id, latitude, longitude in rows:
+
+                point = (latitude, longitude)
+
+                distance = haversine(
+                    city_hall,
+                    point,
+                    unit=Unit.METERS
+                )
+
+                if distance <= 100:
+                    trips_near_city_hall.add(trip_id)
 
         results = sorted(trips_near_city_hall)
+
         print("\nQUERY 6")
         print("Trips that passed within 100 m of Porto City Hall:\n")
-        for trip_id in results: print(trip_id)
+
+        for trip_id in results:
+            print(trip_id)
+
         print("\nTotal trips:", len(results))
+
+        return results
 
     def query7(self):
 
@@ -392,49 +422,62 @@ class Task2:
 
         query = """
             SELECT
-                trip_id,
-                point_index,
-                latitude,
-                longitude
-            FROM GPSPoint
-            ORDER BY trip_id, point_index;
+                t.trip_id,
+
+                g_start.latitude,
+                g_start.longitude,
+
+                g_end.latitude,
+                g_end.longitude
+
+            FROM Trip t
+
+            JOIN GPSPoint g_start
+                ON g_start.trip_id = t.trip_id
+                AND g_start.point_index = 0
+
+            JOIN GPSPoint g_end
+                ON g_end.trip_id = t.trip_id
+                AND g_end.point_index = t.point_count - 1
+
+            WHERE t.point_count >= 2;
         """
 
         self.cursor.execute(query)
-        rows = self.cursor.fetchall()
 
         circular_trips = []
 
-        current_trip_id = None
-        start_point = None
-        end_point = None
+        while True:
 
-        for trip_id, point_index, latitude, longitude in rows:
-            current_point = (latitude, longitude)
-            if trip_id != current_trip_id:
-                # Check the previous trip
-                if current_trip_id is not None and start_point is not None and end_point is not None:
-                    distance = haversine( start_point, end_point,unit=Unit.METERS)
-                    if distance <= 50:
-                        circular_trips.append(current_trip_id)
-                # Start a new trip
-                current_trip_id = trip_id
-                start_point = current_point
-                end_point = current_point
-            else:
-                end_point = current_point
+            rows = self.cursor.fetchmany(10000)
 
+            if not rows:
+                break
 
-        # Check the last trip
-        if current_trip_id is not None and start_point is not None and end_point is not None:
-            distance = haversine(start_point, end_point,unit=Unit.METERS)
-            if distance <= 50:
-                circular_trips.append(current_trip_id)
+            for trip_id, start_lat, start_lon, end_lat, end_lon in rows:
+
+                start_point = (start_lat, start_lon)
+                end_point = (end_lat, end_lon)
+
+                distance = haversine(
+                    start_point,
+                    end_point,
+                    unit=Unit.METERS
+                )
+
+                if distance <= 50:
+                    circular_trips.append(trip_id)
+
 
         print("\nQUERY 9")
         print("Circular trips:\n")
-        for trip_id in circular_trips: print(trip_id)
+
+        for trip_id in circular_trips:
+            print(trip_id)
+
         print("\nTotal circular trips:", len(circular_trips))
+
+        return circular_trips
 
 
     def query10(self):
@@ -484,19 +527,25 @@ def main():
 
         #program.query4a() worka
 
-        program.query4b()
+        #program.query4b()  NON FUNZIONA
 
-        program.query5()
+        #print("testo la query 5"); NON FUNZIONA
+        #program.query5()
 
-        program.query6()
+        #print("testo la query 6");     CORRETTA, MA CON UN INDICE 
+        #program.query6()
+        
+        #print("testo la query 7");        FUNZIONA      
+        #program.query7()
 
-        program.query7()
+        #print("testo la query 8");             FUNZIONA
+        #program.query8()
 
-        program.query8()
-
-        program.query9()
-
-        program.query10()
+        #print("testo la query 9");         FUNZIONA RIVISITATA
+        #program.query9()
+        
+        #print("testo la query 10");            funziona 
+        #program.query10()
 
     except Exception as e:
         print("ERROR: Failed to use database:", e)

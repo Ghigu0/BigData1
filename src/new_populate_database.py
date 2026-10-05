@@ -1,8 +1,10 @@
+
 import csv
 import json
 import hashlib
-
 from datetime import datetime, timezone
+
+from haversine import haversine, Unit
 
 from DbConnector import DbConnector
 
@@ -10,20 +12,11 @@ from DbConnector import DbConnector
 class PopulateDatabase:
 
     def __init__(self):
-
         self.connection = DbConnector()
         self.db_connection = self.connection.db_connection
         self.cursor = self.connection.cursor
 
         self.file_name = "../porto/porto.csv"
-
-        # =========================================================
-        # LOAD ONLY HALF OF THE CSV
-        # =========================================================
-        # Original dataset: 1,710,670 rows
-        # Half: 855,335 rows
-
-        self.max_source_rows = 855_335
 
         self.trip_batch_size = 2000
         self.gps_batch_size = 20000
@@ -39,6 +32,7 @@ class PopulateDatabase:
             "MISSING_DATA",
             "POLYLINE"
         ]
+
 
     # =========================================================
     # UTILITY
@@ -113,6 +107,45 @@ class PopulateDatabase:
 
         return cleaned_points
 
+
+    def calculate_trip_distance(self, points):
+
+        # With fewer than two points, the distance
+        # cannot be calculated
+        if len(points) < 2:
+            return None
+
+        total_distance = 0.0
+
+        for i in range(1, len(points)):
+
+            # Dataset format:
+            # (longitude, latitude)
+            #
+            # haversine format:
+            # (latitude, longitude)
+
+            previous_point = (
+                points[i - 1][1],
+                points[i - 1][0]
+            )
+
+            current_point = (
+                points[i][1],
+                points[i][0]
+            )
+
+            distance = haversine(
+                previous_point,
+                current_point,
+                unit=Unit.KILOMETERS
+            )
+
+            total_distance += distance
+
+        return total_distance
+
+
     # =========================================================
     # DUPLICATE ANALYSIS
     # =========================================================
@@ -132,12 +165,10 @@ class PopulateDatabase:
 
     def find_duplicate_trip_ids(self):
 
-        print(
-            f"Analyzing duplicate TRIP_ID values "
-            f"in the first {self.max_source_rows:,} rows..."
-        )
+        print("Analyzing duplicate TRIP_ID values...")
 
         first_signature = {}
+
         duplicated_ids = set()
         conflicting_ids = set()
 
@@ -150,24 +181,21 @@ class PopulateDatabase:
 
             reader = csv.DictReader(file)
 
-            for source_row_number, row in enumerate(
-                reader,
-                start=1
-            ):
-
-                # Stop after half of the CSV
-                if source_row_number > self.max_source_rows:
-                    break
+            for row in reader:
 
                 trip_id = int(
                     row["TRIP_ID"]
                 )
 
-                signature = self.row_signature(row)
+                signature = self.row_signature(
+                    row
+                )
 
                 if trip_id not in first_signature:
 
-                    first_signature[trip_id] = signature
+                    first_signature[trip_id] = (
+                        signature
+                    )
 
                 else:
 
@@ -184,7 +212,8 @@ class PopulateDatabase:
                         )
 
         identical_ids = (
-            duplicated_ids - conflicting_ids
+            duplicated_ids
+            - conflicting_ids
         )
 
         print()
@@ -205,6 +234,7 @@ class PopulateDatabase:
             conflicting_ids
         )
 
+
     # =========================================================
     # SAVE CONFLICTING IDS
     # =========================================================
@@ -221,7 +251,9 @@ class PopulateDatabase:
             newline=""
         ) as file:
 
-            writer = csv.writer(file)
+            writer = csv.writer(
+                file
+            )
 
             writer.writerow([
                 "TRIP_ID"
@@ -234,6 +266,7 @@ class PopulateDatabase:
                 writer.writerow([
                     trip_id
                 ])
+
 
     # =========================================================
     # INSERT BATCH
@@ -274,6 +307,7 @@ class PopulateDatabase:
                     taxi_values
                 )
 
+
             # -----------------------------------------
             # TRIP
             # -----------------------------------------
@@ -288,11 +322,12 @@ class PopulateDatabase:
                     start_time,
                     day_type,
                     missing_data,
-                    point_count
+                    point_count,
+                    distance_km
                 )
                 VALUES (
                     %s, %s, %s, %s, %s,
-                    %s, %s, %s, %s
+                    %s, %s, %s, %s, %s
                 )
             """
 
@@ -300,6 +335,7 @@ class PopulateDatabase:
                 query,
                 trip_rows
             )
+
 
             # -----------------------------------------
             # GPS POINT
@@ -324,12 +360,16 @@ class PopulateDatabase:
                     gps_rows
                 )
 
+
             self.db_connection.commit()
+
 
         except Exception:
 
             self.db_connection.rollback()
+
             raise
+
 
     # =========================================================
     # POPULATE DATABASE
@@ -355,6 +395,7 @@ class PopulateDatabase:
 
         rejected_rows = 0
 
+
         rejected_file = open(
             "rejected_rows.csv",
             "w",
@@ -371,16 +412,12 @@ class PopulateDatabase:
             "reason"
         ])
 
+
         print()
-
-        print(
-            f"Maximum source rows to process: "
-            f"{self.max_source_rows:,}"
-        )
-
         print(
             "Inserting data into database..."
         )
+
 
         with open(
             self.file_name,
@@ -389,28 +426,15 @@ class PopulateDatabase:
             newline=""
         ) as file:
 
-            reader = csv.DictReader(file)
+            reader = csv.DictReader(
+                file
+            )
 
-            for source_row_number, row in enumerate(
+
+            for row_number, row in enumerate(
                 reader,
-                start=1
+                start=2
             ):
-
-                # =================================================
-                # STOP AFTER HALF OF CSV
-                # =================================================
-
-                if (
-                    source_row_number
-                    > self.max_source_rows
-                ):
-                    break
-
-                # CSV header is line 1,
-                # therefore actual file line is +1
-                row_number = (
-                    source_row_number + 1
-                )
 
                 try:
 
@@ -418,17 +442,17 @@ class PopulateDatabase:
                         row["TRIP_ID"]
                     )
 
+
                     # =====================================
                     # CONFLICTING DUPLICATES
                     # =====================================
 
-                    if (
-                        trip_id
-                        in conflicting_ids
-                    ):
+                    if trip_id in conflicting_ids:
 
                         skipped_conflicting_rows += 1
+
                         continue
+
 
                     # =====================================
                     # IDENTICAL DUPLICATES
@@ -440,11 +464,14 @@ class PopulateDatabase:
                     ):
 
                         skipped_identical_duplicates += 1
+
                         continue
+
 
                     processed_trip_ids.add(
                         trip_id
                     )
+
 
                     # =====================================
                     # TAXI
@@ -453,6 +480,7 @@ class PopulateDatabase:
                     taxi_id = int(
                         row["TAXI_ID"]
                     )
+
 
                     # =====================================
                     # CALL TYPE
@@ -473,6 +501,7 @@ class PopulateDatabase:
                             f"{call_type}"
                         )
 
+
                     # =====================================
                     # DAY TYPE
                     # =====================================
@@ -492,6 +521,7 @@ class PopulateDatabase:
                             f"{day_type}"
                         )
 
+
                     # =====================================
                     # ORIGIN FIELDS
                     # =====================================
@@ -508,6 +538,7 @@ class PopulateDatabase:
                         )
                     )
 
+
                     if (
                         origin_call is not None
                         and call_type != "A"
@@ -517,6 +548,7 @@ class PopulateDatabase:
                             "ORIGIN_CALL is not NULL "
                             "but CALL_TYPE is not A"
                         )
+
 
                     if (
                         origin_stand is not None
@@ -528,6 +560,7 @@ class PopulateDatabase:
                             "but CALL_TYPE is not B"
                         )
 
+
                     # =====================================
                     # MISSING DATA
                     # =====================================
@@ -537,6 +570,7 @@ class PopulateDatabase:
                             row["MISSING_DATA"]
                         )
                     )
+
 
                     # =====================================
                     # TIMESTAMP
@@ -555,6 +589,7 @@ class PopulateDatabase:
                         )
                     )
 
+
                     # =====================================
                     # POLYLINE
                     # =====================================
@@ -569,6 +604,18 @@ class PopulateDatabase:
                         points
                     )
 
+
+                    # =====================================
+                    # DISTANCE
+                    # =====================================
+
+                    distance_km = (
+                        self.calculate_trip_distance(
+                            points
+                        )
+                    )
+
+
                     # =====================================
                     # ADD TAXI
                     # =====================================
@@ -577,11 +624,13 @@ class PopulateDatabase:
                         taxi_id
                     )
 
+
                     # =====================================
                     # ADD TRIP
                     # =====================================
 
                     trip_rows.append((
+
                         trip_id,
                         taxi_id,
                         call_type,
@@ -590,8 +639,11 @@ class PopulateDatabase:
                         start_time,
                         day_type,
                         missing_data,
-                        point_count
+                        point_count,
+                        distance_km
+
                     ))
+
 
                     # =====================================
                     # ADD GPS POINTS
@@ -606,17 +658,21 @@ class PopulateDatabase:
                         latitude = point[1]
 
                         gps_rows.append((
+
                             trip_id,
                             point_index,
                             longitude,
                             latitude
+
                         ))
+
 
                     inserted_trips += 1
 
                     inserted_points += (
                         point_count
                     )
+
 
                     # =====================================
                     # FLUSH BATCH
@@ -625,7 +681,9 @@ class PopulateDatabase:
                     if (
                         len(trip_rows)
                         >= self.trip_batch_size
+
                         or
+
                         len(gps_rows)
                         >= self.gps_batch_size
                     ):
@@ -640,6 +698,7 @@ class PopulateDatabase:
                         trip_rows.clear()
                         gps_rows.clear()
 
+
                         print(
                             f"\rTrips inserted: "
                             f"{inserted_trips:,} | "
@@ -649,24 +708,29 @@ class PopulateDatabase:
                             flush=True
                         )
 
+
                 except Exception as error:
 
                     rejected_rows += 1
 
                     rejected_writer.writerow([
+
                         row.get(
                             "TRIP_ID",
                             ""
                         ),
+
                         (
                             f"Row {row_number}: "
                             f"{error}"
                         )
+
                     ])
 
-        # =========================================================
+
+        # =================================================
         # LAST BATCH
-        # =========================================================
+        # =================================================
 
         self.flush_batches(
             taxi_ids,
@@ -674,7 +738,9 @@ class PopulateDatabase:
             gps_rows
         )
 
+
         rejected_file.close()
+
 
         print("\n")
 
@@ -682,35 +748,36 @@ class PopulateDatabase:
             "=== IMPORT COMPLETED ==="
         )
 
-        print(
-            "Source rows processed:",
-            f"{self.max_source_rows:,}"
-        )
 
         print(
             "Trips inserted:",
             f"{inserted_trips:,}"
         )
 
+
         print(
             "GPS points inserted:",
             f"{inserted_points:,}"
         )
+
 
         print(
             "Identical duplicate rows skipped:",
             skipped_identical_duplicates
         )
 
+
         print(
             "Conflicting duplicate rows skipped:",
             skipped_conflicting_rows
         )
 
+
         print(
             "Rows rejected for other reasons:",
             rejected_rows
         )
+
 
     # =========================================================
     # DATABASE CONTROL
@@ -723,6 +790,7 @@ class PopulateDatabase:
         print(
             "=== DATABASE CONTROL ==="
         )
+
 
         self.cursor.execute(
             "SELECT COUNT(*) FROM Taxi"
@@ -737,6 +805,7 @@ class PopulateDatabase:
             taxi_count
         )
 
+
         self.cursor.execute(
             "SELECT COUNT(*) FROM Trip"
         )
@@ -749,6 +818,7 @@ class PopulateDatabase:
             "Trip:",
             trip_count
         )
+
 
         self.cursor.execute(
             "SELECT COUNT(*) FROM GPSPoint"
@@ -772,6 +842,7 @@ def main():
 
         program = PopulateDatabase()
 
+
         # -----------------------------------------
         # Analyze duplicate IDs first
         # -----------------------------------------
@@ -781,6 +852,7 @@ def main():
             conflicting_ids
         ) = program.find_duplicate_trip_ids()
 
+
         # -----------------------------------------
         # Save conflicting IDs for documentation
         # -----------------------------------------
@@ -788,6 +860,7 @@ def main():
         program.save_conflicting_ids(
             conflicting_ids
         )
+
 
         # -----------------------------------------
         # Populate the database
@@ -797,11 +870,13 @@ def main():
             conflicting_ids
         )
 
+
         # -----------------------------------------
         # Final control
         # -----------------------------------------
 
         program.print_database_counts()
+
 
     except Exception as error:
 
@@ -810,11 +885,14 @@ def main():
             error
         )
 
+
     finally:
 
         if program:
+
             program.connection.close_connection()
 
 
 if __name__ == "__main__":
+
     main()
