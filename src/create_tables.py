@@ -63,6 +63,11 @@ TABLES = {
 
             PRIMARY KEY (trip_id, point_index),
 
+            -- Used by query 6: the box around City Hall is a range on
+            -- latitude, so MySQL reads only that slice of the index
+            -- instead of scanning every GPS point.
+            INDEX idx_gps_lat_lon (latitude, longitude),
+
             FOREIGN KEY (trip_id)
                 REFERENCES Trip(trip_id)
                 ON DELETE CASCADE,
