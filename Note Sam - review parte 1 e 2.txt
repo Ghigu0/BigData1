@@ -169,8 +169,27 @@ NB:
     - cambio ora di fine ottobre: con l'ora locale l'ora 01:00-02:00 di quella notte
       si ripete -> pochissimi viaggi, ma da citare nel report
 
+    b493ebe  Q6: prefiltro in SQL col riquadro attorno al Municipio
+             -> in Python arrivano solo i punti nel riquadro, poi haversine
+    c4aee5f  Q6: indice su GPSPoint(latitude, longitude) in create_tables.py
+             -> senza indice il BETWEEN del riquadro scansiona comunque
+                tutti i ~41M punti; con l'indice legge solo la "fetta" di latitudine
+             NB: l'indice rallenta un po' il populate (va aggiornato a ogni insert)
+                 e serve ripopolare (create_tables + populate)
+    a289d25  Q6: stampa totale + tabella dei primi 20 trip_id (non più tutti)
+    110c3a9  Q9: stampa totale + tabella dei primi 20 trip_id (non più tutti)
+    6c07481  Q10: ignorate le pause più lunghe di 8 ore
+             -> in Portogallo un tassista può lavorare al massimo 8 ore al giorno
+                (+ 2 ore di pausa pasti/riposo); una pausa più lunga di un'intera
+                giornata di lavoro è fine turno / giorno libero / ferie, non attesa
+                tra due corse, e gonfierebbe la media
+             -> la soglia è max_idle_seconds all'inizio di query10:
+                se decidiamo 10h (turno + pause) o 12h basta cambiare il numero
+             -> da scrivere nel report con la fonte
+
 Ancora da fare (non toccato):
-    - Q6: prefiltro in SQL col riquadro attorno al Municipio
-    - Q6 e Q9: stampare totale + tabella dei primi 20 invece di tutti gli id
-    - Q10: eventuale soglia sulle pause lunghe (es. > 24h)
+    - src/rejected_rows.csv e src/conflicting_trip_ids.csv sono output del populate:
+      o li mettiamo nel .gitignore o li committiamo solo dopo il populate definitivo
+      (quello su HEAD è di un run senza tabelle: 123k righe "Table doesn't exist")
+    - query.py main(): Q1-Q4a sono commentate -> scommentarle per il run finale
     - grafici EDA, screenshot dal terminale MySQL, sezioni del report
