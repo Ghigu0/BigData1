@@ -1,3 +1,5 @@
+import os
+
 import mysql.connector as mysql
 
 
@@ -12,6 +14,10 @@ class DbConnector:
         -v porto-mysql-data:/var/lib/mysql \
         -d mysql:8.0
 
+    Every connection parameter can be overridden with an environment variable
+    (DB_HOST, DB_PORT, DB_NAME, DB_USER, DB_PASSWORD), so each of us can use a
+    different host/port without editing this file, e.g.:
+        DB_PORT=3307 python query.py
     """
 
     def __init__(self):
@@ -37,9 +43,15 @@ class DbConnector:
         else:
             raise ValueError("Invalid choice. Please enter 1 or 2.")
 
+        HOST = os.getenv("DB_HOST", HOST)
+        PORT = int(os.getenv("DB_PORT", "3306"))
+        DATABASE = os.getenv("DB_NAME", DATABASE)
+        USER = os.getenv("DB_USER", USER)
+        PASSWORD = os.getenv("DB_PASSWORD", PASSWORD)
+
         # Connect to the database
         try:
-            self.db_connection = mysql.connect(host=HOST, database=DATABASE, user=USER, password=PASSWORD, port=3306)
+            self.db_connection = mysql.connect(host=HOST, database=DATABASE, user=USER, password=PASSWORD, port=PORT)
         except Exception as e:
             print("ERROR: Failed to connect to db:", e)
 
