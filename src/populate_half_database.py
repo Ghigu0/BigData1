@@ -618,37 +618,6 @@ class PopulateDatabase:
                         point_count
                     )
 
-                    # =====================================
-                    # FLUSH BATCH
-                    # =====================================
-
-                    if (
-                        len(trip_rows)
-                        >= self.trip_batch_size
-                        or
-                        len(gps_rows)
-                        >= self.gps_batch_size
-                    ):
-
-                        self.flush_batches(
-                            taxi_ids,
-                            trip_rows,
-                            gps_rows
-                        )
-
-                        taxi_ids.clear()
-                        trip_rows.clear()
-                        gps_rows.clear()
-
-                        print(
-                            f"\rTrips inserted: "
-                            f"{inserted_trips:,} | "
-                            f"GPS points inserted: "
-                            f"{inserted_points:,}",
-                            end="",
-                            flush=True
-                        )
-
                 except Exception as error:
 
                     rejected_rows += 1
@@ -663,6 +632,40 @@ class PopulateDatabase:
                             f"{error}"
                         )
                     ])
+
+                # =====================================
+                # FLUSH BATCH
+                # =====================================
+                # Flushed outside the per-row try: a database error must stop
+                # the import instead of being logged as a rejected row (which
+                # left the buffers full and retried the same batch forever).
+
+                if (
+                    len(trip_rows)
+                    >= self.trip_batch_size
+                    or
+                    len(gps_rows)
+                    >= self.gps_batch_size
+                ):
+
+                    self.flush_batches(
+                        taxi_ids,
+                        trip_rows,
+                        gps_rows
+                    )
+
+                    taxi_ids.clear()
+                    trip_rows.clear()
+                    gps_rows.clear()
+
+                    print(
+                        f"\rTrips inserted: "
+                        f"{inserted_trips:,} | "
+                        f"GPS points inserted: "
+                        f"{inserted_points:,}",
+                        end="",
+                        flush=True
+                    )
 
         # =========================================================
         # LAST BATCH
