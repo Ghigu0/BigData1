@@ -103,12 +103,12 @@ class Task2:
     def query4b(self): #query number 4   ( FUNZIONA )
 
         # 1. Average duration and average distance per call type
-
-        # average trip duration 
+        # (duration_s and distance_km are precomputed per trip in populate)
         query_average = """
             SELECT
                 call_type,
-                ROUND(AVG((point_count - 1) * 15 / 60.0), 2) AS avg_duration_minutes
+                ROUND(AVG(duration_s) / 60.0, 2) AS avg_duration_minutes,
+                ROUND(AVG(distance_km), 2) AS avg_distance_km
             FROM Trip
             WHERE point_count >= 1
             GROUP BY call_type
@@ -116,85 +116,9 @@ class Task2:
         """
         self.cursor.execute(query_average)
         average_rows = self.cursor.fetchall()
-        print("\nQUERY 4b: Average trip duration\n")
+        print("\nQUERY 4b: Average trip duration and distance\n")
         print(tabulate(average_rows, headers=self.cursor.column_names))
 
-     
-
-
-
-     
-       # Get call_type for each trip
-        query_trip_types = """
-            SELECT trip_id, call_type
-            FROM Trip;
-        """
-
-        self.cursor.execute(query_trip_types)
-        trip_rows = self.cursor.fetchall()
-
-        trip_call_type = {}
-
-        for trip_id, call_type in trip_rows:
-            trip_call_type[trip_id] = call_type
-
-
-        # Get GPS points without JOIN
-        query_points = """
-            SELECT
-                trip_id,
-                point_index,
-                latitude,
-                longitude
-            FROM GPSPoint
-            ORDER BY trip_id, point_index;
-        """
-
-        self.cursor.execute(query_points)
-
-        trip_distances = {}
-        previous_point = None
-        previous_trip_id = None
-
-        while True:
-
-            rows = self.cursor.fetchmany(10000)
-
-            if not rows:
-                break
-
-            for trip_id, point_index, latitude, longitude in rows:
-
-                current_point = (latitude, longitude)
-                call_type = trip_call_type[trip_id]
-
-                if trip_id != previous_trip_id:
-
-                    previous_trip_id = trip_id
-                    previous_point = current_point
-
-                    if call_type not in trip_distances:
-                        trip_distances[call_type] = []
-
-                    trip_distances[call_type].append(0)
-
-                else:
-
-                    distance = haversine(
-                        previous_point,
-                        current_point,
-                        unit=Unit.KILOMETERS
-                    )
-
-                    trip_distances[call_type][-1] += distance
-
-                    previous_point = current_point
-
-        print("\nQUERY 4b - Average distance per call type\n")
-        for call_type, distances in trip_distances.items():
-            average_distance = sum(distances) / len(distances)
-            print(  call_type, round(average_distance, 2), "km")
- 
         # 2. Share of trips in the four time bands
         query_time_bands = """
             SELECT
@@ -246,82 +170,25 @@ class Task2:
 
     def query5(self):
 
-        # Total hours driven per taxi
-        query_hours = """
+        # Total hours and distance driven per taxi
+        # (duration_s and distance_km are precomputed per trip in populate)
+        query = """
             SELECT
                 taxi_id,
-                SUM(
-                    CASE
-                        WHEN point_count >= 1
-                        THEN (point_count - 1) * 15 / 3600.0
-                        ELSE 0
-                    END
-                ) AS total_hours
+                ROUND(SUM(duration_s) / 3600.0, 2) AS total_hours,
+                ROUND(SUM(distance_km), 2) AS total_distance_km
             FROM Trip
-            GROUP BY taxi_id;
+            GROUP BY taxi_id
+            ORDER BY total_hours DESC;
         """
 
-        self.cursor.execute(query_hours)
-        hours_rows = self.cursor.fetchall()
-
-        # Dictionary: taxi_id -> total hours
-        taxi_hours = {}
-
-        for taxi_id, total_hours in hours_rows:
-            taxi_hours[taxi_id] = float(total_hours)
-
-        # Get GPS points ordered by taxi, trip and point index
-        query_distance = """
-            SELECT
-                t.taxi_id,
-                g.trip_id,
-                g.point_index,
-                g.latitude,
-                g.longitude
-            FROM Trip t
-            JOIN GPSPoint g
-                ON t.trip_id = g.trip_id
-            ORDER BY t.taxi_id, g.trip_id, g.point_index;
-        """
-
-        self.cursor.execute(query_distance)
+        self.cursor.execute(query)
         rows = self.cursor.fetchall()
-
-        # Dictionary: taxi_id -> total distance
-        taxi_distance = {}
-
-        previous_trip_id = None
-        previous_point = None
-
-        for taxi_id, trip_id, point_index, latitude, longitude in rows:
-
-            current_point = (latitude, longitude)
-            if taxi_id not in taxi_distance:
-                taxi_distance[taxi_id] = 0
-
-            # If we are still inside the same trip,
-            # calculate distance from previous point
-            if trip_id == previous_trip_id:
-
-                distance = haversine(previous_point, current_point, unit=Unit.KILOMETERS )
-                taxi_distance[taxi_id] += distance
-
-            previous_trip_id = trip_id
-            previous_point = current_point
-
-        # Combine hours and distances
-        results = []
-        for taxi_id, total_hours in taxi_hours.items():
-            total_distance = taxi_distance.get(taxi_id, 0)
-            results.append(( taxi_id, round(total_hours, 2), round(total_distance, 2)))
-
-        # Sort by total hours, descending
-        results.sort( key=lambda row: row[1], reverse=True )
 
         print("\nQUERY 5")
         print("Taxis ordered by total hours driven:\n")
 
-        print(tabulate(results, headers=["taxi_id","total_hours", "total_distance_km"]))
+        print(tabulate(rows, headers=self.cursor.column_names))
 
 
     def query6(self):
@@ -374,11 +241,10 @@ class Task2:
             SELECT
                 trip_id,
                 start_time,
-                TIMESTAMPADD(SECOND, (point_count - 1) * 15, start_time ) AS end_time
+                end_time
             FROM Trip
             WHERE point_count >= 1
-            AND DATE(start_time) <> DATE(
-                    TIMESTAMPADD( SECOND, (point_count - 1) * 15, start_time ));
+            AND DATE(start_time) <> DATE(end_time);
         """
 
         self.cursor.execute(query)
@@ -390,14 +256,19 @@ class Task2:
 
     def query9(self):
 
+        # Start/end coordinates are precomputed per trip in populate.
+        # Only valid trips (>= 3 points) are considered: a trip with a single
+        # point has start = end, so it would always look circular.
         query = """
             SELECT
                 trip_id,
-                point_index,
-                latitude,
-                longitude
-            FROM GPSPoint
-            ORDER BY trip_id, point_index;
+                start_lat,
+                start_lon,
+                end_lat,
+                end_lon
+            FROM Trip
+            WHERE point_count >= 3
+            ORDER BY trip_id;
         """
 
         self.cursor.execute(query)
@@ -405,36 +276,10 @@ class Task2:
 
         circular_trips = []
 
-        current_trip_id = None
-        start_point = None
-        end_point = None
-        point_count = 0
-
-        # Only valid trips (>= 3 points) are considered: a trip with a single
-        # point has start = end, so it would always look circular.
-        for trip_id, point_index, latitude, longitude in rows:
-            current_point = (latitude, longitude)
-            if trip_id != current_trip_id:
-                # Check the previous trip
-                if current_trip_id is not None and point_count >= 3:
-                    distance = haversine( start_point, end_point,unit=Unit.METERS)
-                    if distance <= 50:
-                        circular_trips.append(current_trip_id)
-                # Start a new trip
-                current_trip_id = trip_id
-                start_point = current_point
-                end_point = current_point
-                point_count = 1
-            else:
-                end_point = current_point
-                point_count += 1
-
-
-        # Check the last trip
-        if current_trip_id is not None and point_count >= 3:
-            distance = haversine(start_point, end_point,unit=Unit.METERS)
+        for trip_id, start_lat, start_lon, end_lat, end_lon in rows:
+            distance = haversine((start_lat, start_lon), (end_lat, end_lon), unit=Unit.METERS)
             if distance <= 50:
-                circular_trips.append(current_trip_id)
+                circular_trips.append(trip_id)
 
         print("\nQUERY 9")
         print("Circular trips:\n")
@@ -453,7 +298,7 @@ class Task2:
                     taxi_id,
                     TIMESTAMPDIFF(
                         SECOND,
-                        TIMESTAMPADD( SECOND, (point_count - 1) * 15, start_time),
+                        end_time,
                         LEAD(start_time) OVER (PARTITION BY taxi_id ORDER BY start_time)
                     ) AS idle_seconds
                 FROM Trip
