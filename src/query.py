@@ -342,13 +342,13 @@ def main():
     try:
         program = Task2()
 
-        #program.query1() testata funziona 
+        program.query1()
 
-        #program.query2() worka
+        program.query2()
+        
+        program.query3()
 
-        #program.query3() worka
-
-        #program.query4a() worka
+        program.query4a()
 
         program.query4b()
 
