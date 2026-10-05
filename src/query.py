@@ -299,6 +299,12 @@ class Task2:
 
     def query10(self):
 
+        # A gap longer than a whole working day is not idle time between
+        # rides but time off (end of shift, days off, holidays) and would
+        # inflate the average. In Portugal a taxi driver may work at most
+        # 8 hours a day, so longer gaps are ignored.
+        max_idle_seconds = 8 * 3600
+
         query = """
             SELECT
                 taxi_id,
@@ -315,13 +321,13 @@ class Task2:
                 WHERE point_count >= 1
             ) AS idle_times
 
-            WHERE idle_seconds >= 0
+            WHERE idle_seconds BETWEEN 0 AND %s
             GROUP BY taxi_id
             ORDER BY avg_idle_minutes DESC
             LIMIT 20;
         """
 
-        self.cursor.execute(query)
+        self.cursor.execute(query, (max_idle_seconds,))
         rows = self.cursor.fetchall()
         print("\nQUERY 10")
         print("Top 20 taxis with the highest average idle time:\n")
