@@ -303,7 +303,7 @@ class Task2:
             # calculate distance from previous point
             if trip_id == previous_trip_id:
 
-                distance = haversine(revious_point, current_point, unit=Unit.KILOMETERS )
+                distance = haversine(previous_point, current_point, unit=Unit.KILOMETERS )
                 taxi_distance[taxi_id] += distance
 
             previous_trip_id = trip_id
