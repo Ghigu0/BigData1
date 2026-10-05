@@ -408,12 +408,15 @@ class Task2:
         current_trip_id = None
         start_point = None
         end_point = None
+        point_count = 0
 
+        # Only valid trips (>= 3 points) are considered: a trip with a single
+        # point has start = end, so it would always look circular.
         for trip_id, point_index, latitude, longitude in rows:
             current_point = (latitude, longitude)
             if trip_id != current_trip_id:
                 # Check the previous trip
-                if current_trip_id is not None and start_point is not None and end_point is not None:
+                if current_trip_id is not None and point_count >= 3:
                     distance = haversine( start_point, end_point,unit=Unit.METERS)
                     if distance <= 50:
                         circular_trips.append(current_trip_id)
@@ -421,12 +424,14 @@ class Task2:
                 current_trip_id = trip_id
                 start_point = current_point
                 end_point = current_point
+                point_count = 1
             else:
                 end_point = current_point
+                point_count += 1
 
 
         # Check the last trip
-        if current_trip_id is not None and start_point is not None and end_point is not None:
+        if current_trip_id is not None and point_count >= 3:
             distance = haversine(start_point, end_point,unit=Unit.METERS)
             if distance <= 50:
                 circular_trips.append(current_trip_id)
