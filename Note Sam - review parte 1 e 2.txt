@@ -187,9 +187,34 @@ NB:
                 se decidiamo 10h (turno + pause) o 12h basta cambiare il numero
              -> da scrivere nel report con la fonte
 
+    (commit grafici) EDA_script/visualize.py + EDA_script/figures/*.png
+             -> un solo passaggio sul CSV a chunk (~20 s), PNG pronti per il report:
+                trips_per_call_type        B 817.881, C 528.019, A 364.770
+                points_per_trip            43.904 viaggi con < 3 punti (linea tratteggiata);
+                                           coda lunga: ~3.400 viaggi con > 400 punti (> 100 min)
+                trips_per_taxi             448 taxi, ~11 con pochissimi viaggi
+                trips_per_hour             picchi alle 9 e 14-16, di notte ~50k viaggi/ora
+                trips_per_month            costante (125k-162k); 2014-07 quasi vuoto:
+                                           sono i viaggi del 30/06 sera UTC che in ora di Porto
+                                           cadono il 1/07 -> effetto del fuso, da citare
+                gps_density_map            mappa di densità (1 viaggio ogni 50) + Municipio di Q6
+                start_points_by_call_type  i viaggi B partono a "puntini" = i posteggi taxi,
+                                           A e C ovunque -> conferma ORIGIN_STAND
+             -> ore/mesi in ora di Porto (Europe/Lisbon), come nel populate
+             -> serve pandas + matplotlib (non sono in requirements.txt, come le altre EDA)
+
+    (commit grafici) EDA_script/point_cloud_pptk.py: quello del tutorial del prof
+             -> punti GPS come nuvola di punti, z = 0, coordinate in metri (UTM zona 29,
+                Porto; nel tutorial Pechino è la 50)
+             -> 2 attributi, si cambiano con [ e ]: tipo di chiamata (A blu, B arancio,
+                C verde acqua) e posizione nel viaggio (chiaro = inizio, scuro = fine)
+             NB: pptk esiste solo per Python <= 3.7 -> serve un env apposta (conda, vedi
+                 commento in cima al file). Non l'ho potuto provare: qui c'è Python 3.12.
+                 pyproj è opzionale (senza usa una proiezione approssimata, ok per una città)
+
 Ancora da fare (non toccato):
     - src/rejected_rows.csv e src/conflicting_trip_ids.csv sono output del populate:
       o li mettiamo nel .gitignore o li committiamo solo dopo il populate definitivo
       (quello su HEAD è di un run senza tabelle: 123k righe "Table doesn't exist")
     - query.py main(): Q1-Q4a sono commentate -> scommentarle per il run finale
-    - grafici EDA, screenshot dal terminale MySQL, sezioni del report
+    - screenshot dal terminale MySQL, sezioni del report (grafici: vedi sopra)
