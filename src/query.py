@@ -195,16 +195,24 @@ class Task2:
 
         city_hall = (41.15794, -8.62911)  # (latitude, longitude)
 
+        # Prefilter in SQL with a box around City Hall, so only a few
+        # points reach Python: 0.0009 deg of latitude ~ 100 m and, at this
+        # latitude, 0.0012 deg of longitude ~ 100 m. The box contains the
+        # 100 m circle; haversine below keeps only the points really inside.
         query = """
             SELECT
                 trip_id,
                 latitude,
                 longitude
             FROM GPSPoint
-            ORDER BY trip_id, point_index;
+            WHERE latitude BETWEEN %s AND %s
+            AND longitude BETWEEN %s AND %s;
         """
 
-        self.cursor.execute(query)
+        self.cursor.execute(query, (
+            city_hall[0] - 0.0009, city_hall[0] + 0.0009,
+            city_hall[1] - 0.0012, city_hall[1] + 0.0012
+        ))
         rows = self.cursor.fetchall()
         trips_near_city_hall = set()
         for trip_id, latitude, longitude in rows:
