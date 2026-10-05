@@ -69,34 +69,89 @@ TRIP
 
         );
 
-        e chat aggiungerebbe 
 
-            CREATE INDEX idx_trip_taxi_start        
-            ON Trip(taxi_id, start_time);
-            Nel vostro assignment è particolarmente utile per la domanda sull’idle
-            time tra viaggi consecutivi, perché dovrai prendere i viaggi di ogni taxi ordinati cronologicamente
 
-            CREATE INDEX idx_trip_call_type
-            ON Trip(call_type);
-            Detto questo, una precisazione importante: l’indice su call_type probabilmente non è molto utile nel 
-            tuo dataset, perché call_type ha solo 3 valori possibili. MySQL spesso non trae grandi vantaggi da un indice su una colonna con pochissima varietà.
+con aggiunta 
+
+
+
+CREATE TABLE Trip (
+    trip_id BIGINT PRIMARY KEY,
+
+    taxi_id BIGINT NOT NULL,
+
+    call_type CHAR(1) NOT NULL,
+
+    origin_call BIGINT NULL,
+
+    origin_stand INT NULL,
+
+    start_time DATETIME NOT NULL,
+
+    day_type CHAR(1) NOT NULL,
+
+    missing_data BOOLEAN NOT NULL,
+
+    point_count INT NOT NULL,
+
+  
+
+    distance_km DOUBLE NULL,
+
+    FOREIGN KEY (taxi_id)
+        REFERENCES Taxi(taxi_id),
+
+    CHECK (call_type IN ('A', 'B', 'C')),
+
+    CHECK (day_type IN ('A', 'B', 'C')),
+
+    CHECK (
+        origin_call IS NULL
+        OR call_type = 'A'
+    ),
+
+    CHECK (
+        origin_stand IS NULL
+        OR call_type = 'B'
+    )
+);
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
     GPS POINT 
 
             CREATE TABLE GPSPoint (
-            trip_id BIGINT NOT NULL,        // per identificare il trip
+            trip_id BIGINT NOT NULL,        
 
-            point_index INT NOT NULL,       // numero del punto di questo viaggio 
+            point_index INT NOT NULL,       
 
             longitude DOUBLE NOT NULL,
             latitude DOUBLE NOT NULL,
 
-            PRIMARY KEY (trip_id, point_index), //la chiave è il viaggio e il numero del punto 
+            PRIMARY KEY (trip_id, point_index), 
 
             FOREIGN KEY (trip_id)
                 REFERENCES Trip(trip_id)
-                ON DELETE CASCADE,          // se elimini un viaggio, elimini tutte le righe che costruiscono il gpspoint
+                ON DELETE CASCADE,          
 
             CHECK (longitude BETWEEN -180 AND 180),
             CHECK (latitude BETWEEN -90 AND 90)
@@ -119,6 +174,28 @@ TRIP
 
 
 
+
+
+        e chat aggiungerebbe 
+
+            CREATE INDEX idx_trip_taxi_start        
+            ON Trip(taxi_id, start_time);
+            Nel vostro assignment è particolarmente utile per la domanda sull’idle
+            time tra viaggi consecutivi, perché dovrai prendere i viaggi di ogni taxi ordinati cronologicamente
+
+            CREATE INDEX idx_trip_call_type
+            ON Trip(call_type);
+            Detto questo, una precisazione importante: l’indice su call_type probabilmente non è molto utile nel 
+            tuo dataset, perché call_type ha solo 3 valori possibili. MySQL spesso non trae grandi vantaggi da un indice su una colonna con pochissima varietà.
+
+
+            questa ci mette 2 minuti 
+
+
+            
+            CREATE INDEX idx_gps_lat_lon
+            ON GPSPoint(latitude, longitude);
+            questo serve per una query
 
 
 
