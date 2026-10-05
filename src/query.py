@@ -292,8 +292,9 @@ class Task2:
 
         print("\nQUERY 9")
         print("Circular trips:\n")
-        for trip_id in circular_trips: print(trip_id)
-        print("\nTotal circular trips:", len(circular_trips))
+        print("Total circular trips:", len(circular_trips))
+        print("\nFirst 20:\n")
+        print(tabulate([[trip_id] for trip_id in circular_trips[:20]], headers=["trip_id"]))
 
 
     def query10(self):
