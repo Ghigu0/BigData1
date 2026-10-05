@@ -29,8 +29,13 @@ TABLES = {
             missing_data BOOLEAN NOT NULL,
             point_count INT NOT NULL,
 
+            -- Deleting a taxi removes its trips (and, through the
+            -- GPSPoint foreign key, their points): a trip without its
+            -- taxi has no meaning in this dataset.
             FOREIGN KEY (taxi_id)
-                REFERENCES Taxi(taxi_id),
+                REFERENCES Taxi(taxi_id)
+                ON DELETE CASCADE
+                ON UPDATE CASCADE,
 
             CHECK (call_type IN ('A', 'B', 'C')),
             CHECK (day_type IN ('A', 'B', 'C')),
