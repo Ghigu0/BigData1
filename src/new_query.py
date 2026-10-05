@@ -346,7 +346,7 @@ class Task2:
         print(tabulate(rows, headers=self.cursor.column_names))
 
 
-    def query8(self):
+    def query8(self): // prendi sam 
 
         query = """
             SELECT
@@ -366,7 +366,7 @@ class Task2:
         print(tabulate(rows, headers=self.cursor.column_names))
 
 
-    def query9(self):
+    def query9(self): // prendi sam
 
         query = """
             SELECT
@@ -428,7 +428,7 @@ class Task2:
         return circular_trips
 
 
-    def query10(self):
+    def query10(self): // tieni sam 
 
         query = """
             SELECT
