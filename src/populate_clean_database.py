@@ -1,9 +1,13 @@
 import csv
 import json
 import hashlib
-from datetime import datetime, timezone
+from datetime import datetime
+from zoneinfo import ZoneInfo
 
 from DbConnector import DbConnector
+
+
+PORTO_TZ = ZoneInfo("Europe/Lisbon")
 
 
 class PopulateDatabase:
@@ -437,10 +441,12 @@ class PopulateDatabase:
                         row["TIMESTAMP"]
                     )
 
+                    # Porto local time (Europe/Lisbon, UTC+1 in summer),
+                    # so HOUR()/DATE() in the queries match local hours.
                     start_time = (
                         datetime.fromtimestamp(
                             unix_timestamp,
-                            tz=timezone.utc
+                            tz=PORTO_TZ
                         ).replace(
                             tzinfo=None
                         )
