@@ -8,6 +8,7 @@ from zoneinfo import ZoneInfo
 from haversine import haversine, Unit
 
 from DbConnector import DbConnector
+from create_tables import create_indexes
 
 
 PORTO_TZ = ZoneInfo("Europe/Lisbon")
@@ -881,6 +882,12 @@ def main():
         program.populate_database(
             conflicting_ids
         )
+
+        # -----------------------------------------
+        # Secondary indexes, built once on the loaded data
+        # -----------------------------------------
+
+        create_indexes(program.cursor)
 
         # -----------------------------------------
         # Final control

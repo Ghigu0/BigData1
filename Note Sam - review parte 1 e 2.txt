@@ -176,6 +176,18 @@ NB:
                 tutti i ~41M punti; con l'indice legge solo la "fetta" di latitudine
              NB: l'indice rallenta un po' il populate (va aggiornato a ogni insert)
                  e serve ripopolare (create_tables + populate)
+             !! SBAGLIATO, vedi commit "indice dopo il populate" qui sotto
+    (commit indice dopo il populate)
+             -> provato a ripopolare: con l'indice nel CREATE TABLE il populate
+                andava a ~105 viaggi/s (~4-5 ore per tutto il CSV). Python all'11% di CPU:
+                il collo di bottiglia era MySQL, che inseriva ogni punto anche nell'indice
+                ordinato per latitudine (= posizioni casuali) con un buffer pool di 128 MB
+                (default del container) -> quasi ogni insert va su disco
+             -> ora l'indice NON è nel CREATE TABLE: è in INDEXES di create_tables.py
+                e lo crea il populate alla fine (create_indexes), in un colpo solo sui dati
+                già caricati -> qualche minuto invece di ore
+             -> create_indexes salta gli indici che esistono già
+             -> da citare nel report: indici secondari dopo il bulk load
     a289d25  Q6: stampa totale + tabella dei primi 20 trip_id (non più tutti)
     110c3a9  Q9: stampa totale + tabella dei primi 20 trip_id (non più tutti)
     6c07481  Q10: ignorate le pause più lunghe di 8 ore

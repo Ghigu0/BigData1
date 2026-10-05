@@ -63,11 +63,6 @@ TABLES = {
 
             PRIMARY KEY (trip_id, point_index),
 
-            -- Used by query 6: the box around City Hall is a range on
-            -- latitude, so MySQL reads only that slice of the index
-            -- instead of scanning every GPS point.
-            INDEX idx_gps_lat_lon (latitude, longitude),
-
             FOREIGN KEY (trip_id)
                 REFERENCES Trip(trip_id)
                 ON DELETE CASCADE,
@@ -77,6 +72,40 @@ TABLES = {
         )
     """
 }
+
+
+# =========================================================
+# INDEXES
+# =========================================================
+# Secondary indexes are created AFTER populate, not in CREATE TABLE:
+# building an index once on the loaded data takes minutes, while
+# keeping it updated during ~80M inserts (in random latitude order)
+# makes populate several times slower.
+
+INDEXES = {
+
+    # Used by query 6: the box around City Hall is a range on
+    # latitude, so MySQL reads only that slice of the index
+    # instead of scanning every GPS point.
+    "idx_gps_lat_lon": "CREATE INDEX idx_gps_lat_lon ON GPSPoint (latitude, longitude)"
+}
+
+
+def create_indexes(cursor):
+    cursor.execute("""
+        SELECT DISTINCT index_name
+        FROM information_schema.statistics
+        WHERE table_schema = DATABASE()
+    """)
+    existing = {row[0] for row in cursor.fetchall()}
+
+    for index_name, query in INDEXES.items():
+        if index_name in existing:
+            print("Index already exists:", index_name)
+            continue
+        print("Creating index (may take a few minutes):", index_name)
+        cursor.execute(query)
+        print("Created index:", index_name)
 
 
 class CreateTables:
