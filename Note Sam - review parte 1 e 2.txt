@@ -1,0 +1,176 @@
+=====================================================
+PARTE 1 (EDA + schema + popolamento)
+=====================================================
+
+- l'EDA è completa: nulli, distribuzioni, invalidi, duplicati, origin_stand mancante. Copre quello che chiede la consegna
+- lo schema Taxi -> Trip -> GPSPoint secondo me è giusto
+- point_count in Trip è un'ottima idea: le query 7, 8 e 10 diventano banali
+- il parsing è fatto bene (validazioni + rejected_rows.csv)
+
+Cose da decidere insieme:
+
+    1) FUSO ORARIO
+        start_time viene salvato in UTC (datetime.fromtimestamp(..., tz=timezone.utc)).
+        Porto però è Europe/Lisbon -> d'estate è UTC+1.
+        Effetto: per i viaggi estivi le fasce orarie (4b) e i midnight crossers (8) sono sfasati di 1 ora.
+
+        Fix facile in fase di insert:
+            from zoneinfo import ZoneInfo
+            datetime.fromtimestamp(ts, tz=ZoneInfo("Europe/Lisbon")).replace(tzinfo=None)
+
+        NB: se cambiamo 1) bisogna ripopolare il DB, quindi conviene farle insieme in un colpo solo.
+
+
+- duplicati in conflitto (78 ID): li scartiamo tutti. Va benissimo, basta scriverlo nel report
+- i CREATE TABLE non sono nel codice -> la consegna vuole lo schema documentato,
+    farei un create_tables.py (così è anche riproducibile)
+- in flush_batches, se un batch fallisce i buffer non vengono svuotati
+    -> ritenta all'infinito lo stesso batch. Improbabile, ma è un bug
+
+
+=====================================================
+PARTE 2 (query.py)
+=====================================================
+
+    Q2  ok, solo che headers="average_trips_per_taxi" è una stringa -> tabulate la spezza lettera per lettera.
+        Va messo headers=["average_trips_per_taxi"]
+    Q4b funziona, ma: fuso orario (vedi sopra) + si scarica tutti i punti GPS in Python
+    Q5  CRASHA: typo "revious_point" invece di "previous_point" (~riga 299)
+        + fa fetchall() di ~41M righe con JOIN e ORDER BY taxi_id -> rischio di finire la RAM
+    Q6  fetchall() di tutti i punti + haversine in Python su tutti -> lentissimo / RAM
+    Q7  ok (magari nel report aggiungiamo il dettaglio 0 / 1 / 2 punti che hai già nell'EDA)
+    Q8  logica giusta, ma risente del fuso UTC
+    Q9  BUG: i viaggi con 1 solo punto hanno inizio = fine -> distanza 0 -> vengono contati come circolari.
+        Bisogna considerare solo point_count >= 3. Anche qui fetchall() di tutto
+    Q10 ok. Nel report diciamo che le pause lunghe (ferie, giorni di fermo) gonfiano la media
+        (magari mettiamo una soglia, tipo ignorare pause > 24h?)
+
+
+=====================================================
+PROPOSTA PER LA PARTE 2
+=====================================================
+
+Le query 4b, 5, 6 e 9 si rileggono TUTTI i punti GPS ogni volta.
+Idea: calcolare una volta sola, per ogni viaggio, delle colonne extra in Trip:
+
+    distance_km                      (somma haversine tra punti consecutivi)
+    duration_s                       ((point_count - 1) * 15)
+    end_time                         (start_time + duration)
+    start_lat, start_lon, end_lat, end_lon
+
+Si possono calcolare direttamente nel populate (lì i punti sono già in memoria),
+quindi se ripopoliamo il DB viene gratis.
+
+Dopo:
+    4b -> AVG(duration_s), AVG(distance_km) GROUP BY call_type, tutto in SQL
+    5  -> SUM(duration_s), SUM(distance_km) GROUP BY taxi_id, tutto in SQL
+    9  -> confronto start/end coords, niente GPSPoint
+    6  -> prefiltro in SQL con un riquadro attorno al Municipio
+          (lat 41.15794 ± 0.0009, lon -8.62911 ± 0.0012 ~ 100 m)
+          e haversine in Python solo sui pochi punti rimasti
+    8, 10 -> usano end_time direttamente
+
+
+=====================================================
+CHECK DEI "TIPS" DELLA SPECIFICA
+=====================================================
+
+    [ok]  Dizionari per i lookup
+            usati bene (trip_call_type, taxi_hours, taxi_distance, first_signature...)
+            -> lo citiamo nel report
+
+    [ok]  Haversine
+            usato in 4b, 5, 6, 9
+
+    [~]   Tabulate
+            usato quasi ovunque, ma:
+                - Q2: headers come stringa (vedi sopra)
+                - Q4b (distanze), Q6 e Q9 stampano con print() -> farei tabulate anche lì
+                - Q6 e Q9 stampano TUTTI i trip_id (potrebbero essere migliaia):
+                  meglio totale + tabella dei primi 20, che viene meglio anche negli screenshot
+
+    [~]   Datetime in MySQL
+            usati HOUR(), DATE(), TIMESTAMPADD, TIMESTAMPDIFF -> bene
+            unico problema: il fuso orario (vedi sopra)
+
+    [~]   Regole di cascade sulle foreign key
+            nello schema delle note GPSPoint -> Trip ha ON DELETE CASCADE, bene
+            Trip -> Taxi invece non ha regole: decidiamo (CASCADE o RESTRICT) e
+            spieghiamo la scelta nel report, visto che il tip lo chiede esplicitamente
+            (+ anche qui: i CREATE TABLE vanno messi nel codice)
+
+    [no]  Variabili MySQL (SET @x / @var := ...)
+            non usate. In realtà con MySQL 8 le window function (LEAD in Q10, RANK in Q4a)
+            fanno la stessa cosa in modo più pulito -> scriviamo nel report che abbiamo
+            preferito le window function. Se vogliamo usarle da qualche parte, ad es. Q6:
+                SET @lat = 41.15794, @lon = -8.62911;
+            e poi il prefiltro con @lat ± 0.0009 / @lon ± 0.0012
+
+    [no]  Terminale MySQL per controlli veloci (docker exec -it mysql-bigdata mysql -u gruppo25 -p gruppo_25)
+            non è codice, ma utile: un paio di SELECT * ... LIMIT 5 sulle tabelle
+            fanno ottimi screenshot per il report (sezione inserimento dati)
+
+    [no]  Visualizzazione dei dati
+            l'EDA ha solo output testuali (nessun grafico).
+            Idee facili con matplotlib, da fare sul CSV:
+                - barre: viaggi per CALL_TYPE
+                - istogramma: numero di punti per viaggio (si vedono bene gli invalidi < 3)
+                - istogramma: viaggi per taxi
+                - viaggi per ora del giorno / mese
+                - scatter di un campione di punti GPS (praticamente si vede la mappa di Porto)
+            Non è obbligatorio, ma l'EDA è "open-ended" e i grafici nel report fanno la loro figura
+
+
+=====================================================
+COSE PRATICHE
+=====================================================
+
+    - ognuno ha il suo DB locale -> per avere gli stessi risultati dobbiamo caricare
+      con lo STESSO populate (quello corretto dopo le decisioni di sopra)
+    - DbConnector: renderei host/porta configurabili (variabili d'ambiente),
+      così non dobbiamo modificare il file ognuno per conto suo
+
+=====================================================
+FATTO NELLA BRANCH sam_fix (da confermare insieme)
+=====================================================
+
+Un commit per ogni modifica -> se una non va bene: git revert <hash>
+
+    c322363  Q5: typo revious_point -> previous_point (crashava)
+    8da0143  Q2: headers=["average_trips_per_taxi"] (lista, non stringa)
+    10ebe42  Q9: circolari solo i viaggi con point_count >= 3
+    f667e01  populate: il flush dei batch è fuori dal try/except della singola riga
+             -> un errore del DB ferma l'import invece di essere contato come
+                riga scartata e ritentare all'infinito lo stesso batch
+                (sia populate_clean che populate_half)
+    b3274cd  DbConnector: DB_HOST, DB_PORT, DB_NAME, DB_USER, DB_PASSWORD come
+             variabili d'ambiente (sovrascrivono i valori del menu)
+             es: DB_PORT=3307 python query.py
+    6c27799  nuovo src/create_tables.py: lo schema delle note ora è nel codice
+             (DROP + CREATE delle 3 tabelle, chiede conferma prima)
+    4ff8793  Trip -> Taxi: ON DELETE CASCADE + ON UPDATE CASCADE
+             (coerente con GPSPoint -> Trip; se preferiamo RESTRICT è una parola)
+    18a486d  fuso orario: start_time salvato in ora di Porto (Europe/Lisbon)
+             + tzdata in requirements.txt (serve a zoneinfo su Windows)
+    c3908c5  colonne extra in Trip, calcolate nel populate:
+                duration_s, end_time, distance_km,
+                start_lat, start_lon, end_lat, end_lon
+    adc62eb  query 4b, 5, 8, 9, 10 usano le colonne nuove
+                4b, 5 -> tutto in SQL (AVG/SUM di duration_s e distance_km)
+                9     -> confronto start/end da Trip, niente GPSPoint
+                8, 10 -> usano end_time
+             nessuna di queste rilegge più i ~41M punti GPS
+
+NB:
+    - NON testato sul DB vero: solo compilazione + test a parte di fuso orario
+      e calcolo durata/distanza su un viaggio di prova
+    - bisogna RIPOPOLARE: python create_tables.py, poi populate
+    - adc62eb dipende da c3908c5: se si revertano le colonne, prima le query
+    - cambio ora di fine ottobre: con l'ora locale l'ora 01:00-02:00 di quella notte
+      si ripete -> pochissimi viaggi, ma da citare nel report
+
+Ancora da fare (non toccato):
+    - Q6: prefiltro in SQL col riquadro attorno al Municipio
+    - Q6 e Q9: stampare totale + tabella dei primi 20 invece di tutti gli id
+    - Q10: eventuale soglia sulle pause lunghe (es. > 24h)
+    - grafici EDA, screenshot dal terminale MySQL, sezioni del report
