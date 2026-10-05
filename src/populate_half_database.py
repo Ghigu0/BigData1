@@ -2,8 +2,10 @@ import csv
 import json
 import hashlib
 
-from datetime import datetime
+from datetime import datetime, timedelta
 from zoneinfo import ZoneInfo
+
+from haversine import haversine, Unit
 
 from DbConnector import DbConnector
 
@@ -116,6 +118,44 @@ class PopulateDatabase:
             )
 
         return cleaned_points
+
+    def trip_summary(self, start_time, points):
+        """
+        Returns (duration_s, end_time, distance_km,
+                 start_lat, start_lon, end_lat, end_lon).
+        Points are (longitude, latitude), sampled every 15 s.
+        A trip without points has duration 0, distance 0
+        and NULL coordinates.
+        """
+
+        if not points:
+            return (0, start_time, 0.0, None, None, None, None)
+
+        duration_s = (len(points) - 1) * 15
+        end_time = start_time + timedelta(seconds=duration_s)
+
+        distance_km = 0.0
+
+        for (lon1, lat1), (lon2, lat2) in zip(points, points[1:]):
+            distance_km += haversine(
+                (lat1, lon1),
+                (lat2, lon2),
+                unit=Unit.KILOMETERS
+            )
+
+        start_lon, start_lat = points[0]
+        end_lon, end_lat = points[-1]
+
+        return (
+            duration_s,
+            end_time,
+            distance_km,
+            start_lat,
+            start_lon,
+            end_lat,
+            end_lon
+        )
+
 
     # =========================================================
     # DUPLICATE ANALYSIS
@@ -292,11 +332,20 @@ class PopulateDatabase:
                     start_time,
                     day_type,
                     missing_data,
-                    point_count
+                    point_count,
+                    duration_s,
+                    end_time,
+                    distance_km,
+                    start_lat,
+                    start_lon,
+                    end_lat,
+                    end_lon
                 )
                 VALUES (
                     %s, %s, %s, %s, %s,
-                    %s, %s, %s, %s
+                    %s, %s, %s, %s, %s,
+                    %s, %s, %s, %s, %s,
+                    %s
                 )
             """
 
@@ -576,6 +625,26 @@ class PopulateDatabase:
                     )
 
                     # =====================================
+                    # TRIP SUMMARY
+                    # =====================================
+                    # Computed once here (the points are already
+                    # in memory) so the queries do not need to
+                    # re-read every GPS point.
+
+                    (
+                        duration_s,
+                        end_time,
+                        distance_km,
+                        start_lat,
+                        start_lon,
+                        end_lat,
+                        end_lon
+                    ) = self.trip_summary(
+                        start_time,
+                        points
+                    )
+
+                    # =====================================
                     # ADD TAXI
                     # =====================================
 
@@ -596,7 +665,14 @@ class PopulateDatabase:
                         start_time,
                         day_type,
                         missing_data,
-                        point_count
+                        point_count,
+                        duration_s,
+                        end_time,
+                        distance_km,
+                        start_lat,
+                        start_lon,
+                        end_lat,
+                        end_lon
                     ))
 
                     # =====================================

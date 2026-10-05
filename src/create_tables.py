@@ -29,6 +29,16 @@ TABLES = {
             missing_data BOOLEAN NOT NULL,
             point_count INT NOT NULL,
 
+            -- Per-trip summary computed while populating, so the
+            -- queries do not have to re-read all GPS points.
+            duration_s INT NOT NULL,            -- (point_count - 1) * 15, 0 if no points
+            end_time DATETIME NOT NULL,         -- start_time + duration_s
+            distance_km DOUBLE NOT NULL,        -- sum of haversine between consecutive points
+            start_lat DOUBLE NULL,              -- NULL if the trip has no points
+            start_lon DOUBLE NULL,
+            end_lat DOUBLE NULL,
+            end_lon DOUBLE NULL,
+
             -- Deleting a taxi removes its trips (and, through the
             -- GPSPoint foreign key, their points): a trip without its
             -- taxi has no meaning in this dataset.
