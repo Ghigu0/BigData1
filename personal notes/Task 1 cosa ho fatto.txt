@@ -101,6 +101,9 @@ Infine un'analisi generica sulla distribuzione dei dati per vedere cosa aspettar
         B: 817881 viaggi (47.81%)
         C: 528019 viaggi (30.87%)
 
+
+
+
         === DISTRIBUZIONE DAY_TYPE ===
         A: 1710670 viaggi (100.00%)
 
