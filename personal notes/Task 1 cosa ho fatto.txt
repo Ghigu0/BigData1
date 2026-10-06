@@ -102,8 +102,6 @@ Infine un'analisi generica sulla distribuzione dei dati per vedere cosa aspettar
         C: 528019 viaggi (30.87%)
 
 
-
-
         === DISTRIBUZIONE DAY_TYPE ===
         A: 1710670 viaggi (100.00%)
 
@@ -120,7 +118,6 @@ Infine un'analisi generica sulla distribuzione dei dati per vedere cosa aspettar
 
 infine un'ultima analisi suggerita da chat 
 
-    
         === DUPLICATI TRIP_ID ===
         TRIP_ID duplicati: 81                           <- IMPORTANTE DIREI 
 
@@ -142,9 +139,6 @@ infine un'ultima analisi suggerita da chat
         TIMESTAMP massimo: 1404172796 -> 2014-06-30 23:59:56
 
 vediamo se i duplicati sono uguali identici o diversi 
-
-
-
 
 
 (BigData) C:\Users\fbinn\Desktop\BigData1\porto>python duplicated_ID.py
@@ -233,7 +227,3 @@ ID duplicati con righe diverse: 78
    1403407180620000242
    1403716904620000337
    1404093316620000307
-
-(BigData) C:\Users\fbinn\Desktop\BigData1\porto>
-
-

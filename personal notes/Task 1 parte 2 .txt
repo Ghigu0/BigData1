@@ -27,114 +27,49 @@ TAXI                                        la tabella taxi in realtà è omitti
         );
 
 
-TRIP 
+TRIP ( non è quella finale, sam la tua trip ha campi in più )
 
 
         CREATE TABLE Trip (
+            trip_id BIGINT PRIMARY KEY,
 
-            trip_id BIGINT PRIMARY KEY,     // id del viaggio
+            taxi_id BIGINT NOT NULL,
 
-            taxi_id BIGINT NOT NULL,        // id del taxi 
+            call_type CHAR(1) NOT NULL,
 
-            call_type CHAR(1) NOT NULL,     // tipo di chiamata
+            origin_call BIGINT NULL,
 
-            origin_call BIGINT NULL,        //ID del cliete, solo se call_type = A
+            origin_stand INT NULL,
 
-            origin_stand INT NULL,          //ID del taxi stand, solo se call_type = B 
+            start_time DATETIME NOT NULL,
 
-            start_time DATETIME NOT NULL,   //timestamp convertito da unix time a un vero datetime
-
-            day_type CHAR(1) NOT NULL,      //anche se nel dataset è sempre A
+            day_type CHAR(1) NOT NULL,
 
             missing_data BOOLEAN NOT NULL,
 
-            point_count INT NOT NULL,       // colonna aggiunta: contiene il numero di punti GPS, per righe invalide
+            point_count INT NOT NULL,
 
-            FOREIGN KEY (taxi_id)           // collegamento con la tabella Taxi_id
+        
+
+            distance_km DOUBLE NULL,
+
+            FOREIGN KEY (taxi_id)
                 REFERENCES Taxi(taxi_id),
 
             CHECK (call_type IN ('A', 'B', 'C')),
 
-            CHECK (day_type IN ('A', 'B', 'C'))
+            CHECK (day_type IN ('A', 'B', 'C')),
 
-            CHECK (                             // questo è un vincolo un po' largo, perchè mi sono spaventato dal caso origin_stand
-                    origin_call IS NULL
-                    OR call_type = 'A'
-                    )
+            CHECK (
+                origin_call IS NULL
+                OR call_type = 'A'
+            ),
 
-            CHECK (                             // questo è così per via del dataset
-                    origin_stand IS NULL
-                    OR call_type = 'B'
-                    )
-
+            CHECK (
+                origin_stand IS NULL
+                OR call_type = 'B'
+            )
         );
-
-
-
-con aggiunta 
-
-
-
-CREATE TABLE Trip (
-    trip_id BIGINT PRIMARY KEY,
-
-    taxi_id BIGINT NOT NULL,
-
-    call_type CHAR(1) NOT NULL,
-
-    origin_call BIGINT NULL,
-
-    origin_stand INT NULL,
-
-    start_time DATETIME NOT NULL,
-
-    day_type CHAR(1) NOT NULL,
-
-    missing_data BOOLEAN NOT NULL,
-
-    point_count INT NOT NULL,
-
-  
-
-    distance_km DOUBLE NULL,
-
-    FOREIGN KEY (taxi_id)
-        REFERENCES Taxi(taxi_id),
-
-    CHECK (call_type IN ('A', 'B', 'C')),
-
-    CHECK (day_type IN ('A', 'B', 'C')),
-
-    CHECK (
-        origin_call IS NULL
-        OR call_type = 'A'
-    ),
-
-    CHECK (
-        origin_stand IS NULL
-        OR call_type = 'B'
-    )
-);
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
 
     GPS POINT 
@@ -189,10 +124,6 @@ CREATE TABLE Trip (
             tuo dataset, perché call_type ha solo 3 valori possibili. MySQL spesso non trae grandi vantaggi da un indice su una colonna con pochissima varietà.
 
 
-            questa ci mette 2 minuti 
-
-
-            
             CREATE INDEX idx_gps_lat_lon
             ON GPSPoint(latitude, longitude);
             questo serve per una query
@@ -207,6 +138,6 @@ POLYLINE=[]	                                Mantengo Trip, ma inserisco 0 righe 
 POLYLINE con 1 o 2 punti	                Mantengo Trip e i punti disponibili
 <3 punti	                                Non elimino: sarà un invalid trip
 DAY_TYPE sempre A	                        Mantengo comunque la colonna
-timestamp Unix	                            Lo converto in DATETIME
+timestamp Unix	                            Lo converto in DATETIME più la roba del fusoorario
 2 TRIP_ID con duplicati identici	        Tengo una sola copia
 78 TRIP_ID con record conflittuali	        Va presa una decisione specifica prima dell'inserimento
