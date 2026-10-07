@@ -39,7 +39,12 @@ password: root
 A compatible Docker container can be created with:
 
 ```bash
-docker run --name porto-mysql   -e MYSQL_ROOT_PASSWORD=root   -e MYSQL_DATABASE=gruppo_25   -p 3306:3306   -v porto-mysql-data:/var/lib/mysql   -d mysql:8.0
+docker run --name porto-mysql \
+    -e MYSQL_ROOT_PASSWORD=root \
+    -e MYSQL_DATABASE=gruppo_25 \
+    -p 3306:3306 \
+    -v porto-mysql-data:/var/lib/mysql \
+    -d mysql:8.0
 ```
 
 The Docker volume keeps the database persistent even if the container is stopped or removed.
@@ -83,7 +88,7 @@ end_lon
 4. `start_lat` and `start_lon` store the coordinates of the first GPS point of the trip.
 5. `end_lat` and `end_lon` store the coordinates of the last GPS point of the trip.
 
-## `new_populate_database.py`
+## `populate_clean_database.py`
 
 This script imports the Porto CSV dataset into MySQL.
 
@@ -121,28 +126,22 @@ Some queries originally required scanning the complete `GPSPoint` table. Since t
 For example:
 
 - trip distance is precomputed and stored in `Trip.distance_km`;
-- queries that only need the first and last GPS point use the primary key `(trip_id, point_index)` instead of reading the complete trajectory;
+- queries that only need the first and last GPS point read the precomputed `start_lat`, `start_lon`, `end_lat`, `end_lon` columns of `Trip` instead of the complete trajectory;
 - the City Hall proximity query first applies a geographical bounding-box filter;
-- GPS data is read in batches with `fetchmany()` when streaming is necessary, rather than loading the complete result into RAM with `fetchall()`.
+- trip duration and end time are precomputed in `Trip.duration_s` and `Trip.end_time`.
 
 These changes significantly reduce execution time and memory usage.
 
 ## Database indexes
 
-Several indexes are used to improve query performance.
-
-For example:
+The only secondary index is used by the City Hall proximity query (query 6), so that the bounding box is a range read on the index instead of a full scan of `GPSPoint`:
 
 ```sql
-CREATE INDEX idx_trip_taxi_start
-ON Trip(taxi_id, start_time);
-
-CREATE INDEX idx_trip_call_type
-ON Trip(call_type);
-
 CREATE INDEX idx_gps_lat_lon
 ON GPSPoint(latitude, longitude);
 ```
+
+It is defined in `create_tables.py` and created at the end of `populate_clean_database.py`, after all the data has been inserted, because building it once on the loaded data is much faster than keeping it updated during the import.
 
 The `GPSPoint` table also has the composite primary key:
 

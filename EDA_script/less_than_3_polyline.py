@@ -1,6 +1,6 @@
 import pandas as pd
 
-FILE_NAME = "../porto/porto.csv"v
+FILE_NAME = "../porto/porto.csv"
 CHUNK_SIZE = 100000
 
 count_0_points = 0
